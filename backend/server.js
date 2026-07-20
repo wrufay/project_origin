@@ -284,6 +284,30 @@ Be generous in identification and make the cultural context engaging and educati
   }
 });
 
+// Definition endpoint using Gemini
+app.post('/api/definition', async (req, res) => {
+  try {
+    const { word } = req.body;
+
+    if (!word) {
+      return res.status(400).json({ error: 'No word provided' });
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+    const result = await model.generateContent(
+      `Give a concise, learner-friendly definition (1-2 sentences) of "${word}" as it's used in everyday English. Respond with plain text only, no markdown or JSON.`
+    );
+
+    const definition = result.response.text().trim();
+
+    res.json({ definition });
+  } catch (error) {
+    console.error('Definition error:', error);
+    res.status(500).json({ error: 'Failed to fetch definition', details: error.message });
+  }
+});
+
 // Get user's vocabulary
 app.get('/api/vocabulary/:userId', async (req, res) => {
   try {
