@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { API_URL } from '../constants/api';
@@ -50,41 +50,8 @@ export default function TranslationOverlay({
     }
   }, [isScanning]);
 
-  const playPronunciation = async (text: string) => {
-    try {
-      const response = await fetch(`${API_URL}/api/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        console.error('TTS API error:', response.status);
-        return;
-      }
-
-      const data = await response.json();
-
-      if (!data.audio) {
-        console.error('No audio data in response');
-        return;
-      }
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: `data:audio/mpeg;base64,${data.audio}` }
-      );
-
-      await sound.playAsync();
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          sound.unloadAsync();
-        }
-      });
-    } catch (error) {
-      console.error('Audio error:', error);
-      // Silently fail - don't crash the app if TTS fails
-    }
+  const playPronunciation = (text: string) => {
+    Speech.speak(text, { language: 'zh-CN' });
   };
 
   const fetchDefinition = async () => {

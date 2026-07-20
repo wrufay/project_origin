@@ -12,7 +12,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // No auth on these routes yet, so rate limit by IP to bound the AI/API bill.
 // General cap on all API traffic, plus a tighter cap on the routes that call
-// out to Claude/ElevenLabs (the ones that actually cost money per request).
+// out to Claude (the one that actually costs money per request).
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 100,
@@ -344,58 +344,6 @@ app.get('/api/review/:userId', async (req, res) => {
     res.json(words);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch review words' });
-  }
-});
-
-// Text-to-speech endpoint using ElevenLabs
-app.post('/api/tts', aiLimiter, async (req, res) => {
-  try {
-    const { text } = req.body;
-
-    if (!text) {
-      return res.status(400).json({ error: 'No text provided' });
-    }
-
-    console.log('TTS request for text:', text);
-    console.log('Using API key:', process.env.ELEVENLABS_API_KEY ? 'Key exists' : 'NO KEY');
-
-    // Use a Chinese voice ID for better pronunciation
-    const voiceId = 'DowyQ68vDpgFYdWVGjc3'; // This should be a Chinese-capable voice
-
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': process.env.ELEVENLABS_API_KEY
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0,
-          use_speaker_boost: true
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ElevenLabs error status:', response.status);
-      console.error('ElevenLabs error body:', errorText);
-      return res.status(500).json({ error: 'ElevenLabs API error', details: errorText });
-    }
-
-    const audioBuffer = await response.arrayBuffer();
-    const base64Audio = Buffer.from(audioBuffer).toString('base64');
-    console.log('TTS success, audio length:', base64Audio.length);
-
-    res.json({ audio: base64Audio });
-  } catch (error) {
-    console.error('TTS error:', error);
-    res.status(500).json({ error: 'Failed to generate speech', details: error.message });
   }
 });
 
