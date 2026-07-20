@@ -2,11 +2,14 @@
 
 Picking this up on your home computer? Start with **"Next steps"** at the bottom — everything above is what's already done and why.
 
+**Update:** after the section below was originally written, we pivoted the whole backend model — see item #9. The MongoDB/Railway concerns in the original "Next steps" are now moot; skip straight to the new "Next steps" list at the bottom.
+
 ## What was done, in order
 
 All commits are on `master` in this repo (frontend repo, now the merged monorepo). Recent history, newest first:
 
 ```
+4a72a78 Make the app fully local-first: SQLite instead of MongoDB Atlas
 a83d478 Replace Gemini with Claude for scan and definition endpoints
 a36b540 Add rate limiting to the backend
 e250b34 Remove orphaned /api/chat endpoint and Anthropic dependency
@@ -22,7 +25,7 @@ Deleted `components/GlOverlay.tsx`, `objects/` (the .glb/.jpg assets), the folkl
 Deleted `components/SunnyChat.tsx`. `components/WelcomeOverlay.tsx` no longer opens a chat — the mini logo that appears after the welcome overlay dismisses is now purely decorative (per your call, kept as decoration rather than removed).
 
 ### 3. SRS ("spaced repetition") algorithm — reported, not touched
-`services/srs.ts` is a correct SM-2 implementation but **dead code** — nothing in the app calls it, despite `services/README.md` claiming full integration. The *real* spaced-repetition bookkeeping lives server-side in `backend/server.js` (`Word.timesSeenCount` / `Word.nextReview` in MongoDB), but the frontend never calls `/api/vocabulary/:userId` or `/api/review/:userId` to surface due words — so there's no review flow anywhere in the running app today. Left as-is per your call; worth deciding later whether to wire either path up or delete `services/srs.ts`.
+`services/srs.ts` is a correct SM-2 implementation but **dead code** — nothing in the app calls it, despite `services/README.md` claiming full integration. The *real* spaced-repetition bookkeeping lives server-side in `backend/server.js` (now SQLite, see #9 — `timesSeenCount` / `nextReview` per word), but the frontend never calls `/api/vocabulary/:userId` or `/api/review/:userId` to surface due words — so there's no review flow anywhere in the running app today. Left as-is per your call; worth deciding later whether to wire either path up or delete `services/srs.ts`.
 
 ### 4. Merged `project_origin_backend` into this repo as `backend/`
 Used `git subtree add --prefix=backend` — the backend's original 15 commits are preserved in history (visible via `git log --graph --all -- backend/` or similar). The original `~/Desktop/projects/project_origin_backend` standalone repo was left untouched — nothing there was deleted or modified, so it's still there as a backup/reference if you ever want it, but the merged copy in `backend/` is now the one to develop on.
@@ -39,29 +42,34 @@ Since Sunny chat was gone from the frontend, `/api/chat` (the only caller) was d
 None of the backend routes have auth, so anyone with the URL could hammer `/api/scan` / `/api/tts` / `/api/definition` and run up the AI API bill. Added `express-rate-limit`: 100 req/15min per IP on all `/api/` routes, plus a tighter 20 req/15min cap specifically on the three AI-calling routes. Tested locally — confirmed 429s kick in after 20 requests.
 
 ### 8. Replaced Gemini with Claude
-Per your request ("use claude to do the parsing and whatnot instead"): `/api/scan` (image → cultural context JSON) and `/api/definition` now call `claude-opus-4-8` via `@anthropic-ai/sdk` instead of Gemini. `@google/generative-ai` and `GEMINI_API_KEY` are fully gone from the codebase. `ANTHROPIC_API_KEY` is back in `.env.example`.
+Per your request ("use claude to do the parsing and whatnot instead"): `/api/scan` (image → cultural context JSON) and `/api/definition` now call `claude-opus-4-8` via `@anthropic-ai/sdk` instead of Gemini. `@google/generative-ai` and `GEMINI_API_KEY` are fully gone from the codebase. **Confirmed working end-to-end** later this session (see API key status below).
+
+### 9. Pivoted to a fully local-first architecture (MongoDB → SQLite, auto-detected backend URL)
+Since this got posted on LinkedIn, a few strangers might clone it. Rather than maintain a shared hosted backend (and fight MongoDB Atlas/Railway, as items 1–8 above spent a lot of time doing), the model is now: **everyone runs the backend on their own machine with their own API keys.**
+
+- `backend/server.js`: MongoDB Atlas → a local `better-sqlite3` file, `backend/data.sqlite` (gitignored, auto-created on first run, zero setup). Same schema/behavior as before (`timesSeenCount`, `nextReview`, etc.), just no account/network/whitelist to fight.
+- New `constants/api.ts`: `API_URL` auto-detects the backend via Expo's dev-server host (`Constants.expoConfig.hostUri`) instead of a hardcoded URL — works for physical devices, simulators, and web without any manual config, as long as the backend and `npx expo start` run on the same machine. `EXPO_PUBLIC_API_URL` env var overrides it for edge cases (tunnel mode, pointing at a different machine).
+- `README.md` now has a "Running this locally" section covering both halves.
+- **Verified end-to-end locally**: scan → Claude vision → SQLite write → rescanning the same word correctly bumps `timesSeenCount` and flips `isReview: true`.
 
 ## API key status (as of this session)
 
 | Key | Status |
 |---|---|
 | **Gemini** | No longer used — removed from the codebase entirely (see #8). |
-| **ElevenLabs** | Valid, but hit `402 payment_required — Free users cannot use library voices via the API`. The free ElevenLabs plan cannot do TTS over the API with the configured voice. You'll need either a paid ElevenLabs plan, or to swap to a voice/approach the free tier allows, or drop TTS. |
-| **Anthropic** | Not yet tested. `backend/.env` had a placeholder value (`ANTHROPIC_API_KEY=your_anthropic_api_key_here`) as of when this doc was written — you said you'd fill in the real key on your home computer. |
-| **MongoDB** | Inconclusive. The Atlas Network Access list already has `0.0.0.0/0` (allow from anywhere), so it's not a whitelist problem. But **this network blocks outbound port 27017** — confirmed via raw TCP test (443 to the same Atlas host works, 27017 doesn't), so the connection never gets far enough to test the password either. This is a local-network restriction, not an Atlas config problem — cloud hosts like Railway don't usually block arbitrary outbound ports, so it will very likely just work once deployed. Test again on a different network (e.g. mobile hotspot, or your home network) to actually confirm the credentials before deploying. |
+| **ElevenLabs** | Valid, but hit `402 payment_required — Free users cannot use library voices via the API`. The free ElevenLabs plan cannot do TTS over the API with the configured voice. You'll need either a paid ElevenLabs plan, or to swap to a voice/approach the free tier allows, or drop TTS. **Still unresolved — this is the one real open item.** |
+| **Anthropic** | ✅ **Confirmed working.** First attempt hit `401 invalid x-api-key` (a bad paste), you fixed it, and a retest got a clean 200 with a real Claude-generated definition, plus a full `/api/scan` round trip (image → correct identification → SQLite write). |
+| **MongoDB** | No longer relevant — removed entirely in favor of local SQLite (see #9). All the earlier whitelist/port-27017 debugging was real (confirmed via raw TCP test that this network blocks outbound 27017) but is now moot since there's no MongoDB to connect to. |
 
 ## Next steps
 
-1. **Fill in `ANTHROPIC_API_KEY`** in `backend/.env` with your real key.
-2. **Test locally**: `cd backend && npm run dev` (use `PORT=<something free>` if 3000 is taken — check with `lsof -i :3000` first). Watch for `Connected to MongoDB` vs a connection error. If it connects now, the earlier failures really were just this network's port-27017 block.
-3. **Hit the endpoints** with curl to confirm Claude actually works for `/api/scan` and `/api/definition` (a screenshot/photo → base64 → POST works for `/api/scan`; a plain word for `/api/definition`).
-4. **Decide on ElevenLabs**: upgrade to a paid plan, switch voices, or drop the TTS feature if it's not worth it.
-5. **Redeploy the backend.** The live Railway URL (`identitybackend-production-ebf0.up.railway.app`) currently 404s on every route — "Application not found" — meaning the whole deployment is gone, not just misconfigured. You'll need to either relink Railway to this repo's `backend/` folder (it now lives inside `project_origin`, not the old standalone `project_origin_backend` repo) or redeploy from scratch, and set `ANTHROPIC_API_KEY` / `ELEVENLABS_API_KEY` / `MONGODB_URI` in Railway's dashboard env vars (same values as your local `.env`).
-6. **Update the frontend's `API_URL`** if the redeployed backend gets a new URL — it's hardcoded in `app/(tabs)/index.tsx` and `components/TranslationOverlay.tsx` (both currently point at the dead Railway URL).
-7. **Push this repo to GitHub** when you're happy with it — all the work above is committed locally on `master` but hasn't been pushed anywhere yet.
+1. **Decide on ElevenLabs** — the only unresolved key/service. Upgrade to a paid plan, switch to a voice the free tier allows, or drop the TTS feature (tap-to-hear-pronunciation) if it's not worth it.
+2. **Try it on a physical device via Expo Go** to confirm the auto-detected `API_URL` (in `constants/api.ts`) actually reaches your machine's backend over your LAN — this wasn't tested on real hardware this session, only via `curl` against `localhost`.
+3. **Push this repo to GitHub** — everything above is committed locally on `master` but hasn't been pushed. You'll need to authenticate (this sandboxed environment had no stored GitHub credentials, so the push had to be deferred to you) — from a terminal where you're already logged into GitHub: `git push origin master`.
+4. If you still want other people to be able to just install an app without running their own backend, that's a different, bigger project (a real hosted deployment with your own keys, rate-limited/metered somehow) — worth a separate conversation if you want to go there later. The current state optimizes for "cloneable side project," not "app store distribution."
 
 ## Loose ends / FYI, not blocking
 
 - `app/(tabs)/index.tsx.bak` — a stray, tracked, pre-3D/pre-VR backup file sitting in the repo. Untouched this session since it wasn't part of what you asked for; delete it whenever if it's just clutter.
 - `.claude/` in the repo root is this Claude Code session's local state directory — untracked, not part of the app, safe to ignore or gitignore.
-- The original `~/Desktop/projects/project_origin_backend` standalone repo still exists on disk, untouched. Once you're confident `backend/` in this repo is the one true copy, you can archive/delete that directory — but no rush.
+- The original `~/Desktop/projects/project_origin_backend` standalone repo still exists on disk, untouched. It's now fully superseded by `backend/` in this repo (which also has its own local SQLite storage instead of that repo's MongoDB code) — safe to archive/delete whenever, no rush.
