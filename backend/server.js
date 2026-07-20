@@ -102,7 +102,7 @@ app.get('/', (req, res) => {
 // Main scan endpoint - using Claude for everything
 app.post('/api/scan', aiLimiter, async (req, res) => {
   try {
-    const { image, userId = 'default', familiarityLevel = 0 } = req.body;
+    const { image, userId = 'default', familiarityLevel = 0, proficiencyLevel = null, learningGoal = null } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: 'No image provided' });
@@ -110,6 +110,14 @@ app.post('/api/scan', aiLimiter, async (req, res) => {
 
     // Use Claude to detect objects and generate cultural/historical context
     console.log('Starting Claude detection...');
+
+    const proficiencyInstruction = proficiencyLevel
+      ? `\n\nLEARNER PROFICIENCY: ${proficiencyLevel.replace(/_/g, ' ')}\nAdjust the complexity of your explanation and vocabulary in the culturalContext field accordingly - keep sentences simple and avoid jargon for beginners, and use more nuanced framing for intermediate, advanced, or fluent learners.`
+      : '';
+
+    const goalInstruction = learningGoal
+      ? `\n\nLEARNER GOAL: ${learningGoal.replace(/_/g, ' ')}\nLean the cultural context toward what's most useful for this goal - practical/navigational framing for travel, professional framing for business, casual social framing for conversation, character/etymology notes for reading and writing, and historical/traditional depth for culture and traditions.`
+      : '';
 
     let claudeResult;
     try {
@@ -158,6 +166,7 @@ Adjust the culturalContext field based on this familiarity level. The user is le
 - Level 10: Mostly Chinese with some English translation. Example: "月饼是中秋节的传统美食 (Yuèbǐng shì Zhōngqiū Jié de chuántǒng měishí). 家人团聚赏满月，分享月饼。圆形象征着团圆 (The round shape symbolizes reunion)."
 
 IMPORTANT: The translation and pronunciation fields should ALWAYS contain Chinese characters and pinyin regardless of familiarityLevel. Only the culturalContext field changes based on the level.
+${proficiencyInstruction}${goalInstruction}
 
 IMPORTANT INSTRUCTIONS:
 - ALWAYS provide Chinese translation (simplified characters) and pinyin pronunciation for ALL objects, regardless of cultural origin

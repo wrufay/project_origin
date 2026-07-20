@@ -11,6 +11,7 @@ import TranslationOverlay, { FamiliarityChoice } from '../../components/Translat
 import WelcomeOverlay from '../../components/WelcomeOverlay';
 import { API_URL } from '../../constants/api';
 import { Colors } from '../../constants/theme';
+import { UserPrefs } from '../../services/userPreferences';
 
 interface OverlayData {
   english: string;
@@ -47,9 +48,21 @@ export default function App() {
   // Starts at 0 (English only), increases with "Familiar" presses, decreases with "Unfamiliar"
   const [familiarityLevel, setFamiliarityLevel] = useState(0);
 
+  // Onboarding preferences (proficiency/goal) - shape the Claude prompt's
+  // vocabulary complexity and cultural-context framing, when set.
+  const [proficiencyLevel, setProficiencyLevel] = useState<string | null>(null);
+  const [learningGoal, setLearningGoal] = useState<string | null>(null);
+
   // Reset familiarity level to 0 every time the app starts
   useEffect(() => {
     setFamiliarityLevel(0);
+  }, []);
+
+  useEffect(() => {
+    UserPrefs.getPreferences().then((prefs) => {
+      setProficiencyLevel(prefs.proficiencyLevel);
+      setLearningGoal(prefs.learningGoal);
+    });
   }, []);
 
   // Handle familiarity button presses
@@ -112,6 +125,8 @@ export default function App() {
           image: photo.base64,
           userId: 'default',
           familiarityLevel: familiarityLevel, // 0-10 scale for Mandarin immersion
+          proficiencyLevel,
+          learningGoal,
         }),
         signal: controller.signal,
       });
