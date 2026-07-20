@@ -1,8 +1,9 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const Anthropic = require('@anthropic-ai/sdk');
-const mongoose = require('mongoose');
+const Database = require('better-sqlite3');
 require('dotenv').config();
 
 const app = express();
@@ -30,25 +31,23 @@ const aiLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
-
-// Word schema for spaced repetition
-const wordSchema = new mongoose.Schema({
-  userId: String,
-  english: String,
-  translation: String,
-  pronunciation: String,
-  culturalContext: String,
-  timesSeenCount: { type: Number, default: 1 },
-  lastSeen: { type: Date, default: Date.now },
-  nextReview: { type: Date, default: Date.now },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const Word = mongoose.model('Word', wordSchema);
+// Local SQLite database for spaced repetition - no server or account needed,
+// just a file next to this script. Created automatically on first run.
+const db = new Database(path.join(__dirname, 'data.sqlite'));
+db.exec(`CREATE TABLE IF NOT EXISTS words (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId TEXT NOT NULL,
+  english TEXT NOT NULL,
+  translation TEXT,
+  pronunciation TEXT,
+  culturalContext TEXT,
+  timesSeenCount INTEGER NOT NULL DEFAULT 1,
+  lastSeen TEXT NOT NULL,
+  nextReview TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  UNIQUE(userId, english)
+)`);
+console.log('Using local SQLite database at', path.join(__dirname, 'data.sqlite'));
 
 // Initialize Claude
 const anthropic = new Anthropic({
@@ -269,33 +268,23 @@ Be generous in identification and make the cultural context engaging and educati
     };
 
     // Check if user has seen this word before (spaced repetition)
-    const existingWord = await Word.findOne({
-      userId,
-      english: culturalData.english.toLowerCase()
-    });
+    const english = culturalData.english.toLowerCase();
+    const existingWord = db.prepare('SELECT * FROM words WHERE userId = ? AND english = ?').get(userId, english);
 
     let isReview = false;
     if (existingWord) {
       // Update existing word
-      existingWord.timesSeenCount += 1;
-      existingWord.lastSeen = new Date();
-      existingWord.nextReview = new Date(Date.now() + existingWord.timesSeenCount * 24 * 60 * 60 * 1000);
-      existingWord.translation = data.translation;
-      existingWord.pronunciation = data.pronunciation;
-      existingWord.culturalContext = data.culturalContext;
-      await existingWord.save();
+      const timesSeenCount = existingWord.timesSeenCount + 1;
+      const nextReview = new Date(Date.now() + timesSeenCount * 24 * 60 * 60 * 1000).toISOString();
+      db.prepare(`UPDATE words SET timesSeenCount = ?, lastSeen = ?, nextReview = ?, translation = ?, pronunciation = ?, culturalContext = ? WHERE id = ?`)
+        .run(timesSeenCount, new Date().toISOString(), nextReview, data.translation, data.pronunciation, data.culturalContext, existingWord.id);
       isReview = true;
-      data.timesSeenCount = existingWord.timesSeenCount;
+      data.timesSeenCount = timesSeenCount;
     } else {
       // Save new word
-      const newWord = new Word({
-        userId,
-        english: culturalData.english.toLowerCase(),
-        translation: data.translation,
-        pronunciation: data.pronunciation,
-        culturalContext: data.culturalContext
-      });
-      await newWord.save();
+      const now = new Date().toISOString();
+      db.prepare(`INSERT INTO words (userId, english, translation, pronunciation, culturalContext, timesSeenCount, lastSeen, nextReview, createdAt) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`)
+        .run(userId, english, data.translation, data.pronunciation, data.culturalContext, now, now, now);
       data.timesSeenCount = 1;
     }
 
@@ -340,8 +329,7 @@ app.post('/api/definition', aiLimiter, async (req, res) => {
 // Get user's vocabulary
 app.get('/api/vocabulary/:userId', async (req, res) => {
   try {
-    const words = await Word.find({ userId: req.params.userId })
-      .sort({ lastSeen: -1 });
+    const words = db.prepare('SELECT * FROM words WHERE userId = ? ORDER BY lastSeen DESC').all(req.params.userId);
     res.json(words);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch vocabulary' });
@@ -351,10 +339,8 @@ app.get('/api/vocabulary/:userId', async (req, res) => {
 // Get words due for review
 app.get('/api/review/:userId', async (req, res) => {
   try {
-    const words = await Word.find({
-      userId: req.params.userId,
-      nextReview: { $lte: new Date() }
-    }).sort({ nextReview: 1 });
+    const words = db.prepare('SELECT * FROM words WHERE userId = ? AND nextReview <= ? ORDER BY nextReview ASC')
+      .all(req.params.userId, new Date().toISOString());
     res.json(words);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch review words' });

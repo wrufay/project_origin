@@ -2,6 +2,35 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+## Running this locally
+
+Everything runs on your own machine — there's no shared server or database account to set up.
+
+1. Set up the backend (handles the AI calls and local word history):
+
+   ```bash
+   cd backend
+   npm install
+   cp .env.example .env
+   ```
+
+   Then edit `backend/.env` and fill in your own `ANTHROPIC_API_KEY` (from [console.anthropic.com](https://console.anthropic.com)) and `ELEVENLABS_API_KEY` (from [elevenlabs.io](https://elevenlabs.io)). Start it with:
+
+   ```bash
+   npm run dev
+   ```
+
+   This starts the backend on port 3000 and creates `backend/data.sqlite` automatically on first run — a local file that stores your scanned word history, no database server needed.
+
+2. In a separate terminal, from the repo root, install and start the app as usual:
+
+   ```bash
+   npm install
+   npx expo start
+   ```
+
+   The app finds your local backend automatically (via the Expo dev server's own address) as long as both are running on the same machine/network — no manual configuration needed.
+
 ## Get started
 
 1. Install dependencies

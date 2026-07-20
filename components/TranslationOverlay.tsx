@@ -1,6 +1,7 @@
 import { Audio } from 'expo-av';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { API_URL } from '../constants/api';
 
 export type FamiliarityChoice = 'unfamiliar' | 'neutral' | 'familiar';
 
@@ -13,8 +14,6 @@ interface TranslationOverlayProps {
   onDismiss?: () => void;
   onFamiliarityChoice?: (choice: FamiliarityChoice) => void;
 }
-
-const API_URL = 'https://identitybackend-production-ebf0.up.railway.app';
 
 export default function TranslationOverlay({
   translation,

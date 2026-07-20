@@ -9,10 +9,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import TranslationOverlay, { FamiliarityChoice } from '../../components/TranslationOverlay';
 import WelcomeOverlay from '../../components/WelcomeOverlay';
+import { API_URL } from '../../constants/api';
 import { Colors } from '../../constants/theme';
-
-// Backend API URL
-const API_URL = 'https://identitybackend-production-ebf0.up.railway.app';
 
 interface OverlayData {
   english: string;
