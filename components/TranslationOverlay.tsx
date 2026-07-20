@@ -4,11 +4,6 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View
 
 export type FamiliarityChoice = 'unfamiliar' | 'neutral' | 'familiar';
 
-interface FolkloreContent {
-  story: string;
-  modelDescription: string;
-}
-
 interface TranslationOverlayProps {
   translation: string;
   pronunciation: string;
@@ -17,9 +12,6 @@ interface TranslationOverlayProps {
   isScanning?: boolean;
   onDismiss?: () => void;
   onFamiliarityChoice?: (choice: FamiliarityChoice) => void;
-  folkloreContent?: FolkloreContent | null;
-  onFolklorePress?: () => void;
-  showFolklore?: boolean;
 }
 
 const API_URL = 'https://identitybackend-production-ebf0.up.railway.app';
@@ -32,9 +24,6 @@ export default function TranslationOverlay({
   isScanning = false,
   onDismiss,
   onFamiliarityChoice,
-  folkloreContent,
-  onFolklorePress,
-  showFolklore = false,
 }: TranslationOverlayProps) {
   // Check if this is an error/nothing detected message
   const isErrorMessage = !translation && (english.includes('Nothing detected') || english.includes('Try again'));
@@ -43,7 +32,7 @@ export default function TranslationOverlay({
   const [definition, setDefinition] = useState<string | null>(null);
   const [loadingDefinition, setLoadingDefinition] = useState(false);
   const [showDefinition, setShowDefinition] = useState(false);
-  // 0 = show translation, 1 = show cultural context, 2 = hide everything, 3 = show folklore
+  // 0 = show translation, 1 = show cultural context, 2 = hide everything
   const [viewState, setViewState] = useState(0);
 
   useEffect(() => {
@@ -218,37 +207,6 @@ export default function TranslationOverlay({
                 <Text style={styles.familiarityButtonText}>Familiar</Text>
               </TouchableOpacity>
             </View>
-            {/* Folklore button - only shows for special cultural items */}
-            {folkloreContent && (
-              <TouchableOpacity 
-                style={styles.folkloreButton} 
-                onPress={() => {
-                  onFolklorePress?.();
-                  setViewState(3);
-                }}
-              >
-                <Text style={styles.folkloreButtonText}>✨ Discover the Legend</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-        {/* Folklore view - shows story and model description */}
-        {viewState === 3 && folkloreContent && (
-          <>
-            <View style={styles.folkloreBubble}>
-              <Text style={styles.folkloreTitle}>📖 The Legend</Text>
-              <Text style={styles.folkloreStory}>{folkloreContent.story}</Text>
-              <Text style={styles.folkloreModelDesc}>{folkloreContent.modelDescription}</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.folkloreCloseButton} 
-              onPress={() => {
-                onFolklorePress?.(); // Toggle off the 3D model
-                setViewState(2); // Dismiss
-              }}
-            >
-              <Text style={styles.folkloreCloseButtonText}>Close</Text>
-            </TouchableOpacity>
           </>
         )}
       </ScrollView>
@@ -345,67 +303,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7c6a0a',
     fontFamily: 'Lexend_400Regular',
-  },
-  folkloreButton: {
-    marginTop: 16,
-    backgroundColor: 'rgba(255, 182, 193, 0.9)',
-    borderRadius: 25,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderWidth: 2,
-    borderColor: '#ff6b9d',
-  },
-  folkloreButtonText: {
-    fontSize: 14,
-    color: '#8b1538',
-    fontFamily: 'Lexend_500Medium',
-  },
-  folkloreBubble: {
-    marginTop: 20,
-    backgroundColor: "rgba(255, 240, 245, 0.95)",
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderWidth: 3,
-    borderColor: '#ff6b9d',
-    width: '90%',
-    alignSelf: 'center',
-  },
-  folkloreTitle: {
-    fontSize: 18,
-    color: '#8b1538',
-    fontFamily: 'Lexend_600SemiBold',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  folkloreStory: {
-    fontSize: 14,
-    color: '#5a1025',
-    fontFamily: 'Lexend_300Light',
-    lineHeight: 22,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  folkloreModelDesc: {
-    fontSize: 13,
-    color: '#8b1538',
-    fontFamily: 'Lexend_400Regular',
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  folkloreCloseButton: {
-    marginTop: 16,
-    backgroundColor: 'rgba(255, 107, 157, 0.8)',
-    borderRadius: 20,
-    paddingHorizontal: 32,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#ff6b9d',
-  },
-  folkloreCloseButtonText: {
-    fontSize: 14,
-    color: '#fff',
-    fontFamily: 'Lexend_500Medium',
   },
   scanningText: {
     color: '#fefadc',

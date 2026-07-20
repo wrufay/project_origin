@@ -5,9 +5,8 @@ import { Audio } from 'expo-av';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFonts } from 'expo-font';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import GlOverlay from '../../components/GlOverlay';
 import TranslationOverlay, { FamiliarityChoice } from '../../components/TranslationOverlay';
 import WelcomeOverlay from '../../components/WelcomeOverlay';
 import { Colors } from '../../constants/theme';
@@ -22,37 +21,6 @@ interface OverlayData {
   culturalContext: string;
   isReview?: boolean;
   timesSeenCount?: number;
-}
-
-// Folklore stories for special cultural items - connects to the 3D models
-export const FOLKLORE_CONTENT: Record<string, { story: string; modelDescription: string }> = {
-  mooncake: {
-    story: "嫦娥 (Cháng'é) flew to the moon after drinking an immortality elixir. Her husband 后羿 (Hòu Yì), the archer who shot down nine suns, gazes at the moon each Mid-Autumn Festival, hoping to see her.",
-    modelDescription: "The maiden you see is 嫦娥, the Moon Goddess, forever dancing on the lunar surface."
-  },
-  dragonboat: {
-    story: "屈原 (Qū Yuán), a beloved poet, drowned himself in the Miluo River in protest of corruption. Villagers raced boats to save him and threw rice dumplings to keep fish from his body.",
-    modelDescription: "The dragon boats race each year to honor 屈原's memory and his loyalty to his people."
-  },
-  lantern: {
-    story: "During 元宵节 (Yuánxiāo Jié), the Jade Emperor planned to burn down a village. A fairy warned them to light lanterns, fooling him into thinking it was already ablaze. The lion dance scares away the monster 年 (Nián).",
-    modelDescription: "The lion dancer drives away evil spirits, bringing luck and prosperity for the new year."
-  }
-};
-
-// Helper to check if an item has folklore
-export function getFolkloreKey(english: string): string | null {
-  const word = english.toLowerCase();
-  if (word.includes('mooncake') || word.includes('月饼') || word.includes('mid') || word.includes('autumn')) {
-    return 'mooncake';
-  }
-  if (word.includes('zong') || word.includes('粽') || word.includes('dragon boat') || word.includes('龙舟')) {
-    return 'dragonboat';
-  }
-  if (word.includes('lantern') || word.includes('灯笼') || word.includes('红灯笼') || word.includes('lion') || word.includes('red')) {
-    return 'lantern';
-  }
-  return null;
 }
 
 export default function App() {
@@ -76,13 +44,10 @@ export default function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [vrMode, setVrMode] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
-  
+
   // Familiarity level: 0-10, affects how much Mandarin appears in descriptions
   // Starts at 0 (English only), increases with "Familiar" presses, decreases with "Unfamiliar"
   const [familiarityLevel, setFamiliarityLevel] = useState(0);
-  
-  // Controls whether folklore mode is active (shows 3D model + folklore story)
-  const [showFolklore, setShowFolklore] = useState(false);
 
   // Reset familiarity level to 0 every time the app starts
   useEffect(() => {
@@ -101,56 +66,6 @@ export default function App() {
       return prev;
     });
   };
-
-  // Compute 3D models based on detected content - only show when folklore mode is active
-  const models = useMemo(() => {
-    if (!overlay || !showFolklore) {
-      return [];
-    }
-
-    const word = (overlay.english || overlay.translation || '').toLowerCase();
-
-    // Dragon Boat / Zongzi
-    if (word.includes('zong') || word.includes('粽') || word.includes('dragon boat') || word.includes('龙舟')) {
-      return [
-        {
-          id: 'dragonboat',
-          src: require('../../objects/dragon-boats.glb'),
-          textures: [require('../../objects/dragon-boat.jpg')],
-          position: { x: 0, y: -0.5, z: -2.5 },
-          scale: 0.5
-        },
-      ];
-    }
-
-    // Lantern / Lion Dancer
-    if (word.includes('lantern') || word.includes('灯笼') || word.includes('红灯笼') || word.includes('lion') || word.includes('red')) {
-      return [
-        {
-          id: 'lion',
-          src: require('../../objects/lion-dancer.glb'),
-          textures: [require('../../objects/lion-dancer.jpg')],
-          position: { x: 0, y: -0.5, z: -2.5 },
-          scale: 0.6
-        },
-      ];
-    }
-
-    // Mooncake / Mid-Autumn
-    if (word.includes('mooncake') || word.includes('月饼') || word.includes('mid') || word.includes('autumn')) {
-      return [
-        {
-          id: 'midgirl',
-          src: require('../../objects/midautumn-girl.glb'),
-          textures: [require('../../objects/midautumn-girl.jpg')],
-          position: { x: 0, y: -0.5, z: -2.5 },
-          scale: 0.6
-        },
-      ];
-    }
-
-    return [];
-  }, [overlay, showFolklore]);
 
   useEffect(() => {
     if (vrMode) {
@@ -351,14 +266,8 @@ export default function App() {
                 pronunciation={overlay.pronunciation}
                 english={overlay.english}
                 culturalContext={overlay.culturalContext}
-                onDismiss={() => {
-                  setOverlay(null);
-                  setShowFolklore(false);
-                }}
+                onDismiss={() => setOverlay(null)}
                 onFamiliarityChoice={handleFamiliarityChoice}
-                folkloreContent={getFolkloreKey(overlay.english) ? FOLKLORE_CONTENT[getFolkloreKey(overlay.english)!] : null}
-                onFolklorePress={() => setShowFolklore(prev => !prev)}
-                showFolklore={showFolklore}
               />
             ) : (
               <TranslationOverlay
@@ -371,7 +280,6 @@ export default function App() {
           </TouchableOpacity>
         )}
       </CameraView>
-      <GlOverlay models={models} />
       <WelcomeOverlay
         hasSeenWelcome={hasSeenWelcome}
         onWelcomeDismissed={() => setHasSeenWelcome(true)}

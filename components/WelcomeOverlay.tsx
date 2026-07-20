@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native';
 import { Colors } from '../constants/theme';
-import SunnyChat from './SunnyChat';
 
 interface WelcomeOverlayProps {
   onDismiss?: () => void;
@@ -28,7 +27,6 @@ const MINI_LOGO_BOTTOM = 40;
 
 export default function WelcomeOverlay({ onDismiss, hasSeenWelcome, onWelcomeDismissed }: WelcomeOverlayProps) {
   const [animationComplete, setAnimationComplete] = useState(false);
-  const [showChat, setShowChat] = useState(false);
 
   // Use parent's hasSeenWelcome state, or local state if not provided
   const dismissed = hasSeenWelcome || animationComplete;
@@ -82,24 +80,16 @@ export default function WelcomeOverlay({ onDismiss, hasSeenWelcome, onWelcomeDis
     });
   };
 
-  if (showChat) {
-    return <SunnyChat onClose={() => setShowChat(false)} />;
-  }
-
-  // After dismissal, show only the mini logo button with orange background
+  // After dismissal, show only the decorative mini logo
   if (dismissed) {
     return (
-      <TouchableOpacity
-        style={styles.miniLogoButton}
-        onPress={() => setShowChat(true)}
-        activeOpacity={0.8}
-      >
+      <View style={styles.miniLogoButton}>
         <Image
           source={require('../assets/images/sunny.png')}
           style={styles.miniLogo}
           resizeMode="contain"
         />
-      </TouchableOpacity>
+      </View>
     );
   }
 
@@ -139,9 +129,6 @@ export default function WelcomeOverlay({ onDismiss, hasSeenWelcome, onWelcomeDis
           <View style={styles.textBubble}>
             <Text style={styles.text}>
               HOW TO: Tap the screen (or click headphone button* if in VR mode) to translate current object in frame.
-            </Text>
-            <Text style={styles.subtext}>
-              Objects related to holidays may include 3D models of relevant cultural symbols - wait a few seconds to see them rendered.
             </Text>
           </View>
           <Text style={styles.tapHint}>Tap anywhere to continue ☺︎</Text>
@@ -192,15 +179,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Lexend_400Regular',
     lineHeight: 24,
     textAlign: 'center',
-  },
-  subtext: {
-    fontSize: 14,
-    color: Colors.olive,
-    fontFamily: 'Lexend_300Light',
-    lineHeight: 22,
-    textAlign: 'center',
-    marginTop: 12,
-    fontStyle: 'italic',
   },
   tapHint: {
     marginTop: 24,
