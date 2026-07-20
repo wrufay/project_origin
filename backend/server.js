@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const mongoose = require('mongoose');
 require('dotenv').config();
@@ -7,6 +8,27 @@ require('dotenv').config();
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// No auth on these routes yet, so rate limit by IP to bound the AI/API bill.
+// General cap on all API traffic, plus a tighter cap on the routes that call
+// out to Gemini/ElevenLabs (the ones that actually cost money per request).
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests to this endpoint, please try again later.' },
+});
+
+app.use('/api/', apiLimiter);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI)
@@ -77,7 +99,7 @@ app.get('/', (req, res) => {
 });
 
 // Main scan endpoint - using Gemini for everything
-app.post('/api/scan', async (req, res) => {
+app.post('/api/scan', aiLimiter, async (req, res) => {
   try {
     const { image, userId = 'default', familiarityLevel = 0 } = req.body;
 
@@ -279,7 +301,7 @@ Be generous in identification and make the cultural context engaging and educati
 });
 
 // Definition endpoint using Gemini
-app.post('/api/definition', async (req, res) => {
+app.post('/api/definition', aiLimiter, async (req, res) => {
   try {
     const { word } = req.body;
 
@@ -327,7 +349,7 @@ app.get('/api/review/:userId', async (req, res) => {
 });
 
 // Text-to-speech endpoint using ElevenLabs
-app.post('/api/tts', async (req, res) => {
+app.post('/api/tts', aiLimiter, async (req, res) => {
   try {
     const { text } = req.body;
 
