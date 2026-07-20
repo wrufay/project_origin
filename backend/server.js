@@ -356,6 +356,37 @@ app.get('/api/review/:userId', async (req, res) => {
   }
 });
 
+// Record a review outcome for one word
+app.post('/api/review/:userId/:wordId', (req, res) => {
+  try {
+    const { userId, wordId } = req.params;
+    const { remembered } = req.body;
+
+    const word = db.prepare('SELECT * FROM words WHERE id = ? AND userId = ?').get(wordId, userId);
+    if (!word) {
+      return res.status(404).json({ error: 'Word not found' });
+    }
+
+    let timesSeenCount;
+    let nextReview;
+    if (remembered) {
+      timesSeenCount = word.timesSeenCount + 1;
+      nextReview = new Date(Date.now() + timesSeenCount * 24 * 60 * 60 * 1000).toISOString();
+    } else {
+      // Didn't remember it - review again tomorrow, ease off the interval a bit
+      timesSeenCount = Math.max(1, word.timesSeenCount - 1);
+      nextReview = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    db.prepare('UPDATE words SET timesSeenCount = ?, lastSeen = ?, nextReview = ? WHERE id = ?')
+      .run(timesSeenCount, new Date().toISOString(), nextReview, word.id);
+
+    res.json({ id: word.id, timesSeenCount, nextReview });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to record review' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

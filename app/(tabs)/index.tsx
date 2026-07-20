@@ -4,6 +4,7 @@ import { ZCOOLKuaiLe_400Regular } from '@expo-google-fonts/zcool-kuaile';
 import { Audio } from 'expo-av';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFonts } from 'expo-font';
+import { useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -37,12 +38,14 @@ export default function App() {
     Lexend_900Black,
   });
 
+  const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [overlay, setOverlay] = useState<OverlayData | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [vrMode, setVrMode] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
+  const [dueReviewCount, setDueReviewCount] = useState(0);
 
   // Familiarity level: 0-10, affects how much Mandarin appears in descriptions
   // Starts at 0 (English only), increases with "Familiar" presses, decreases with "Unfamiliar"
@@ -63,6 +66,14 @@ export default function App() {
       setProficiencyLevel(prefs.proficiencyLevel);
       setLearningGoal(prefs.learningGoal);
     });
+  }, []);
+
+  // How many scanned words are due for review, shown as a badge on the review button
+  useEffect(() => {
+    fetch(`${API_URL}/api/review/default`)
+      .then((res) => res.json())
+      .then((data) => setDueReviewCount(Array.isArray(data) ? data.length : 0))
+      .catch(() => setDueReviewCount(0));
   }, []);
 
   // Handle familiarity button presses
@@ -257,6 +268,20 @@ export default function App() {
           />
         </TouchableOpacity>
 
+        {/* Review button - top right */}
+        <TouchableOpacity
+          style={styles.reviewButton}
+          onPress={() => router.push('/review')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.reviewButtonText}>📖 Review</Text>
+          {dueReviewCount > 0 && (
+            <View style={styles.reviewBadge}>
+              <Text style={styles.reviewBadgeText}>{dueReviewCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
         {/* Tap anywhere to scan (only when no overlay is shown) */}
         {!overlay && !isScanning && (
           <TouchableOpacity
@@ -318,6 +343,38 @@ const styles = StyleSheet.create({
   modeButtonImage: {
     width: 50,
     height: 50,
+  },
+  reviewButton: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reviewButtonText: {
+    fontSize: 14,
+    fontFamily: 'Lexend_500Medium',
+    color: Colors.olive,
+  },
+  reviewBadge: {
+    marginLeft: 6,
+    backgroundColor: Colors.red,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  reviewBadgeText: {
+    fontSize: 12,
+    fontFamily: 'Lexend_600SemiBold',
+    color: 'white',
   },
 
   grantButton: {
