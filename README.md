@@ -1,79 +1,43 @@
-# Welcome to your Expo app 👋
+# ProjectOrigin
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Point your phone's camera at an everyday object and get its Chinese name, pronunciation, and a short cultural note — powered by Claude. It's meant to make picking up Mandarin part of just looking around, not sitting down to study flashcards.
 
-## Running this locally
+## What it does
 
-Everything runs on your own machine — there's no shared server or database account to set up.
+- **Scan anything** — Claude looks at the photo, identifies the object, and gives you the Chinese translation, pinyin pronunciation, and a short cultural note about it.
+- **Hear it spoken** — tap the word to hear it read aloud, using your phone's own built-in text-to-speech (no internet needed for this part).
+- **Adjusts to you** — mark a word "familiar" or "unfamiliar" and future descriptions shift how much Chinese vs. English they use. During onboarding you also pick a proficiency level and a learning goal (travel, business, conversation, etc.), which shapes how Claude explains things.
+- **Remembers what you've scanned** — your word history is saved locally on your machine (nothing leaves it except the calls to Claude needed to identify objects).
 
-1. Set up the backend (handles the AI calls and local word history):
+## How to run it
 
-   ```bash
-   cd backend
-   npm install
-   cp .env.example .env
-   ```
+Everything runs on your own machine — there's no shared server or account to set up beyond your own Anthropic API key.
 
-   Then edit `backend/.env` and fill in your own `ANTHROPIC_API_KEY` (from [console.anthropic.com](https://console.anthropic.com)) and `ELEVENLABS_API_KEY` (from [elevenlabs.io](https://elevenlabs.io)). Start it with:
-
-   ```bash
-   npm run dev
-   ```
-
-   This starts the backend on port 3000 and creates `backend/data.sqlite` automatically on first run — a local file that stores your scanned word history, no database server needed.
-
-2. In a separate terminal, from the repo root, install and start the app as usual:
-
-   ```bash
-   npm install
-   npx expo start
-   ```
-
-   The app finds your local backend automatically (via the Expo dev server's own address) as long as both are running on the same machine/network — no manual configuration needed.
-
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### 1. Backend (handles the Claude calls + your local word history)
 
 ```bash
-npm run reset-project
+cd backend
+npm install
+cp .env.example .env
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Edit `backend/.env` and fill in your own `ANTHROPIC_API_KEY` (get one at [console.anthropic.com](https://console.anthropic.com)). Then start it:
 
-## Learn more
+```bash
+npm run dev
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+This runs the backend on port 3000 and creates `backend/data.sqlite` automatically on first run — a local file for your word history, no database to set up.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### 2. The app
 
-## Join the community
+In a separate terminal, from the repo root:
 
-Join our community of developers creating universal apps.
+```bash
+npm install
+npx expo start
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Then open it in a [development build](https://docs.expo.dev/develop/development-builds/introduction/), an [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/), an [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/), or [Expo Go](https://expo.dev/go) — whichever the `npx expo start` output offers you.
+
+The app finds your local backend automatically as long as both are running on the same machine/network — no manual configuration needed.
