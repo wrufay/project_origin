@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Anthropic = require('@anthropic-ai/sdk');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
@@ -11,7 +11,7 @@ app.use(express.json({ limit: '10mb' }));
 
 // No auth on these routes yet, so rate limit by IP to bound the AI/API bill.
 // General cap on all API traffic, plus a tighter cap on the routes that call
-// out to Gemini/ElevenLabs (the ones that actually cost money per request).
+// out to Claude/ElevenLabs (the ones that actually cost money per request).
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 100,
@@ -50,8 +50,10 @@ const wordSchema = new mongoose.Schema({
 
 const Word = mongoose.model('Word', wordSchema);
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialize Claude
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 // Hardcoded cultural content for our 3 target items
 const CULTURAL_ITEMS = {
@@ -98,7 +100,7 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'ProjectOrigin API is running' });
 });
 
-// Main scan endpoint - using Gemini for everything
+// Main scan endpoint - using Claude for everything
 app.post('/api/scan', aiLimiter, async (req, res) => {
   try {
     const { image, userId = 'default', familiarityLevel = 0 } = req.body;
@@ -107,27 +109,29 @@ app.post('/api/scan', aiLimiter, async (req, res) => {
       return res.status(400).json({ error: 'No image provided' });
     }
 
-    // Use Gemini to detect objects and generate cultural/historical context
-    console.log('Starting Gemini detection...');
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      generationConfig: {
-        temperature: 0.6,
-        topP: 0.8,
-        topK: 40,
-      }
-    });
+    // Use Claude to detect objects and generate cultural/historical context
+    console.log('Starting Claude detection...');
 
-    let geminiResult;
+    let claudeResult;
     try {
-      geminiResult = await model.generateContent([
-        {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: image
-          }
-        },
-        `You are a knowledgeable cultural expert. Examine this image and identify the most prominent or interesting object, food, symbol, or item visible.
+      claudeResult = await anthropic.messages.create({
+        model: 'claude-opus-4-8',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: 'image/jpeg',
+                  data: image,
+                },
+              },
+              {
+                type: 'text',
+                text: `You are a knowledgeable cultural expert. Examine this image and identify the most prominent or interesting object, food, symbol, or item visible.
 
 MANDARIN IMMERSION LEVEL: ${familiarityLevel}/10
 Adjust the culturalContext field based on this familiarity level. The user is learning Mandarin and this controls how much Chinese vocabulary appears in the description:
@@ -205,43 +209,47 @@ Food with cultural significance:
 
 Respond with ONLY valid JSON in this format. If NO clear object is visible, respond with: {"error": "none"}
 
-Be generous in identification and make the cultural context engaging and educational.`
-      ]);
-      console.log('Gemini call completed successfully');
-    } catch (geminiError) {
-      console.error('Gemini API Error:', geminiError.message);
-      console.error('Full error:', geminiError);
+Be generous in identification and make the cultural context engaging and educational.`,
+              },
+            ],
+          },
+        ],
+      });
+      console.log('Claude call completed successfully');
+    } catch (claudeError) {
+      console.error('Claude API Error:', claudeError.message);
+      console.error('Full error:', claudeError);
       return res.status(500).json({
-        error: 'Failed to call Gemini API',
-        details: geminiError.message
+        error: 'Failed to call Claude API',
+        details: claudeError.message
       });
     }
 
-    let geminiText = geminiResult.response.text().trim();
-    console.log('Raw Gemini response:', geminiText);
+    let claudeText = (claudeResult.content.find(block => block.type === 'text')?.text || '').trim();
+    console.log('Raw Claude response:', claudeText);
 
     // Remove markdown code blocks if present (```json ... ```)
-    if (geminiText.startsWith('```')) {
-      geminiText = geminiText.replace(/^```json?\n?/i, '').replace(/\n?```$/m, '').trim();
-      console.log('After removing markdown:', geminiText);
+    if (claudeText.startsWith('```')) {
+      claudeText = claudeText.replace(/^```json?\n?/i, '').replace(/\n?```$/m, '').trim();
+      console.log('After removing markdown:', claudeText);
     }
 
-    // Parse Gemini's JSON response
+    // Parse Claude's JSON response
     let culturalData;
     try {
-      culturalData = JSON.parse(geminiText);
+      culturalData = JSON.parse(claudeText);
       console.log('Parsed cultural data:', culturalData);
     } catch (parseError) {
       console.error('JSON Parse Error:', parseError.message);
-      console.error('Failed to parse Gemini response:', geminiText);
-      console.error('Response length:', geminiText.length);
-      console.error('First 200 chars:', geminiText.substring(0, 200));
+      console.error('Failed to parse Claude response:', claudeText);
+      console.error('Response length:', claudeText.length);
+      console.error('First 200 chars:', claudeText.substring(0, 200));
 
       // Return a more helpful error
       return res.status(500).json({
         error: 'Failed to parse AI response',
         details: parseError.message,
-        preview: geminiText.substring(0, 100)
+        preview: claudeText.substring(0, 100)
       });
     }
 
@@ -300,7 +308,7 @@ Be generous in identification and make the cultural context engaging and educati
   }
 });
 
-// Definition endpoint using Gemini
+// Definition endpoint using Claude
 app.post('/api/definition', aiLimiter, async (req, res) => {
   try {
     const { word } = req.body;
@@ -309,13 +317,18 @@ app.post('/api/definition', aiLimiter, async (req, res) => {
       return res.status(400).json({ error: 'No word provided' });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const result = await anthropic.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 300,
+      messages: [
+        {
+          role: 'user',
+          content: `Give a concise, learner-friendly definition (1-2 sentences) of "${word}" as it's used in everyday English. Respond with plain text only, no markdown or JSON.`,
+        },
+      ],
+    });
 
-    const result = await model.generateContent(
-      `Give a concise, learner-friendly definition (1-2 sentences) of "${word}" as it's used in everyday English. Respond with plain text only, no markdown or JSON.`
-    );
-
-    const definition = result.response.text().trim();
+    const definition = (result.content.find(block => block.type === 'text')?.text || '').trim();
 
     res.json({ definition });
   } catch (error) {
